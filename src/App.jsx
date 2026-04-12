@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 
-const SERVER = "http://localhost:5000";
+const SERVER = import.meta.env.VITE_SERVER_URL || "http://localhost:5000";
 const PHASES = [
   { id:"general",        label:"General Queries",      short:"P1", color:"#5b9cf6" },
   { id:"must_have",      label:"Must Have",            short:"P2", color:"#34d399" },
