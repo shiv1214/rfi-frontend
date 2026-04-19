@@ -45,8 +45,7 @@ function HeroPage({ onSelect }) {
 
       {/* Logo */}
       <div style={{ textAlign:"center", marginBottom:48 }}>
-        <div style={{ fontSize:13, fontWeight:700, letterSpacing:".3em", color:"rgba(255,255,255,.6)", marginBottom:8, fontFamily:"monospace" }}>TATA MOTORS LIMITED</div>
-        <div style={{ fontSize:48, fontWeight:800, color:"#fff", letterSpacing:"-1px", marginBottom:8 }}>KAVACH</div>
+<div style={{ fontSize:48, fontWeight:800, color:"#fff", letterSpacing:"-1px", marginBottom:8 }}>KAVACH</div>
         <div style={{ fontSize:15, color:"rgba(255,255,255,.75)", letterSpacing:".08em" }}>AI-Powered Supplier Evaluation System</div>
       </div>
 
@@ -60,7 +59,7 @@ function HeroPage({ onSelect }) {
           onMouseLeave={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 20px 60px rgba(0,0,0,.15)"; }}>
           <div style={{ fontSize:48, marginBottom:16 }}>🏭</div>
           <div style={{ fontSize:20, fontWeight:700, color:T.text, marginBottom:8 }}>Login as OEM</div>
-          <div style={{ fontSize:13, color:T.textSub, lineHeight:1.6, marginBottom:20 }}>Tata Motors Design Engineer — Upload RFI, evaluate supplier variants, generate compliance reports</div>
+          <div style={{ fontSize:13, color:T.textSub, lineHeight:1.6, marginBottom:20 }}>Design Engineer — Upload RFI, evaluate supplier variants, generate compliance reports</div>
           <div style={{ background:T.primary, color:"#fff", padding:"10px 24px", borderRadius:8, fontSize:13, fontWeight:600 }}>Enter as OEM →</div>
         </div>
 
@@ -76,7 +75,6 @@ function HeroPage({ onSelect }) {
         </div>
       </div>
 
-      <div style={{ fontSize:12, color:"rgba(255,255,255,.4)" }}>KAVACH v1.0 · Confidential · Tata Motors Limited</div>
     </div>
   );
 }
