@@ -37,44 +37,145 @@ const VC = { Alpha:T.primary, Beta:T.warning, Gamma:T.success, Lambda:T.purple }
 const vc = n => VC[n] || T.textSub;
 
 // ══════════════════════════════════════════════════════════════════
-// HERO / LANDING PAGE
+// HERO / LANDING PAGE  — with car animation
 // ══════════════════════════════════════════════════════════════════
 function HeroPage({ onSelect }) {
-  return (
-    <div style={{ minHeight:"100vh", background:`linear-gradient(135deg, #1971C2 0%, #1864AB 50%, #145591 100%)`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:24 }}>
+  const [phase, setPhase] = useState("driving"); // driving | reveal
+  const [carX, setCarX]   = useState(-320);
+  const carRef = useRef(null);
 
-      {/* Logo */}
-      <div style={{ textAlign:"center", marginBottom:48 }}>
-<div style={{ fontSize:48, fontWeight:800, color:"#fff", letterSpacing:"-1px", marginBottom:8 }}>KAVACH</div>
-        <div style={{ fontSize:15, color:"rgba(255,255,255,.75)", letterSpacing:".08em" }}>AI-Powered Supplier Evaluation System</div>
+  useEffect(() => {
+    // Phase 1: car drives in from left to center
+    const start = performance.now();
+    const duration = 1600;
+    const targetX = 0;
+
+    const drive = (now) => {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      setCarX(-320 + ease * 320);
+      if (t < 1) requestAnimationFrame(drive);
+      else {
+        // Phase 2: short pause, then reveal content
+        setTimeout(() => setPhase("reveal"), 400);
+      }
+    };
+    requestAnimationFrame(drive);
+  }, []);
+
+  return (
+    <div style={{ minHeight:"100vh", background:`linear-gradient(135deg, #0f1c2e 0%, #1971C2 60%, #145591 100%)`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:24, overflow:"hidden", position:"relative" }}>
+
+      {/* Road lines */}
+      <div style={{ position:"absolute", bottom:"30%", left:0, right:0, height:2, background:"rgba(255,255,255,.15)" }}/>
+      <div style={{ position:"absolute", bottom:"28%", left:0, right:0, height:1, background:"rgba(255,255,255,.08)" }}/>
+
+      {/* Animated road dashes */}
+      <div style={{ position:"absolute", bottom:"29%", left:0, right:0, height:3, overflow:"hidden" }}>
+        <div style={{ display:"flex", gap:40, animation:"roadDash 0.6s linear infinite", width:"200%" }}>
+          {Array.from({length:30}).map((_,i) => (
+            <div key={i} style={{ width:60, height:3, background:"rgba(255,255,255,.3)", flexShrink:0 }}/>
+          ))}
+        </div>
+      </div>
+
+      {/* Car SVG */}
+      <div ref={carRef} style={{
+        position:"absolute",
+        bottom:"28%",
+        left:"50%",
+        transform:`translateX(calc(-50% + ${carX}px))`,
+        transition:"none",
+        filter:"drop-shadow(0 8px 24px rgba(0,0,0,.5))",
+        zIndex:10
+      }}>
+        {/* Headlight glow */}
+        <div style={{ position:"absolute", right:-20, top:"30%", width:40, height:20, background:"radial-gradient(ellipse, rgba(255,220,100,.6) 0%, transparent 70%)", filter:"blur(4px)" }}/>
+        <svg width="280" height="100" viewBox="0 0 280 100" fill="none">
+          {/* Body */}
+          <path d="M20 70 L20 50 Q22 35 50 30 L90 20 Q120 12 150 12 Q185 12 210 20 L240 30 Q258 35 260 50 L260 70 Z" fill="#1a3a6b"/>
+          <path d="M20 70 L20 50 Q22 35 50 30 L90 20 Q120 12 150 12 Q185 12 210 20 L240 30 Q258 35 260 50 L260 70 Z" fill="url(#bodyGrad)"/>
+          {/* Roof */}
+          <path d="M90 30 Q120 14 150 13 Q180 12 210 22 L230 30 Q200 18 150 18 Q110 18 90 30Z" fill="#0d2147"/>
+          {/* Windows */}
+          <path d="M95 28 L120 17 Q140 12 165 13 L195 22 L175 29 Q155 22 130 22 Z" fill="#6aaeff" opacity=".7"/>
+          <path d="M175 29 L195 22 L215 28 L200 33Z" fill="#6aaeff" opacity=".6"/>
+          {/* Wheels */}
+          <circle cx="70" cy="72" r="18" fill="#111"/>
+          <circle cx="70" cy="72" r="10" fill="#333"/>
+          <circle cx="70" cy="72" r="4" fill="#888"/>
+          <circle cx="200" cy="72" r="18" fill="#111"/>
+          <circle cx="200" cy="72" r="10" fill="#333"/>
+          <circle cx="200" cy="72" r="4" fill="#888"/>
+          {/* Headlights */}
+          <ellipse cx="258" cy="48" rx="6" ry="5" fill="#ffe680"/>
+          <ellipse cx="258" cy="48" rx="4" ry="3" fill="#fff"/>
+          {/* Tail lights */}
+          <rect x="18" y="45" width="6" height="10" rx="2" fill="#ff3333" opacity=".8"/>
+          {/* Door line */}
+          <line x1="155" y1="30" x2="152" y2="68" stroke="#0d2147" strokeWidth="1.5" opacity=".5"/>
+          {/* Under glow */}
+          <ellipse cx="140" cy="90" rx="100" ry="8" fill="rgba(25,113,194,.3)"/>
+          <defs>
+            <linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(255,255,255,.15)"/>
+              <stop offset="100%" stopColor="rgba(0,0,0,.1)"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+
+      {/* Content — fades in after car arrives */}
+      <div style={{
+        opacity: phase==="reveal" ? 1 : 0,
+        transform: phase==="reveal" ? "translateY(0)" : "translateY(20px)",
+        transition: "opacity 0.8s ease, transform 0.8s ease",
+        textAlign:"center", marginBottom:32, marginTop:-60, zIndex:20
+      }}>
+        <div style={{ fontSize:56, fontWeight:800, color:"#fff", letterSpacing:"-2px", marginBottom:8,
+          textShadow:"0 0 40px rgba(100,180,255,.4)" }}>KAVACH</div>
+        <div style={{ fontSize:15, color:"rgba(255,255,255,.75)", letterSpacing:".12em" }}>AI-POWERED SUPPLIER EVALUATION SYSTEM</div>
       </div>
 
       {/* Cards */}
-      <div style={{ display:"flex", gap:24, flexWrap:"wrap", justifyContent:"center", marginBottom:48 }}>
-
+      <div style={{
+        display:"flex", gap:24, flexWrap:"wrap", justifyContent:"center",
+        opacity: phase==="reveal" ? 1 : 0,
+        transform: phase==="reveal" ? "translateY(0)" : "translateY(30px)",
+        transition: "opacity 0.8s ease 0.3s, transform 0.8s ease 0.3s",
+        zIndex:20
+      }}>
         {/* OEM Card */}
         <div onClick={() => onSelect("oem")}
-          style={{ background:"#fff", borderRadius:16, padding:36, width:280, cursor:"pointer", boxShadow:"0 20px 60px rgba(0,0,0,.15)", transition:"transform .2s, box-shadow .2s", textAlign:"center" }}
-          onMouseEnter={e => { e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 28px 70px rgba(0,0,0,.2)"; }}
-          onMouseLeave={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 20px 60px rgba(0,0,0,.15)"; }}>
-          <div style={{ fontSize:48, marginBottom:16 }}>🏭</div>
-          <div style={{ fontSize:20, fontWeight:700, color:T.text, marginBottom:8 }}>Login as OEM</div>
-          <div style={{ fontSize:13, color:T.textSub, lineHeight:1.6, marginBottom:20 }}>Design Engineer — Upload RFI, evaluate supplier variants, generate compliance reports</div>
+          style={{ background:"rgba(255,255,255,.97)", borderRadius:16, padding:32, width:260, cursor:"pointer",
+            boxShadow:"0 20px 60px rgba(0,0,0,.3)", transition:"transform .2s, box-shadow .2s", textAlign:"center" }}
+          onMouseEnter={e => { e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 28px 70px rgba(0,0,0,.4)"; }}
+          onMouseLeave={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 20px 60px rgba(0,0,0,.3)"; }}>
+          <div style={{ fontSize:44, marginBottom:12 }}>🏭</div>
+          <div style={{ fontSize:18, fontWeight:700, color:T.text, marginBottom:8 }}>Login as OEM</div>
+          <div style={{ fontSize:12, color:T.textSub, lineHeight:1.6, marginBottom:18 }}>Design Engineer — Upload RFI, evaluate supplier variants, generate compliance reports</div>
           <div style={{ background:T.primary, color:"#fff", padding:"10px 24px", borderRadius:8, fontSize:13, fontWeight:600 }}>Enter as OEM →</div>
         </div>
 
         {/* Supplier Card */}
         <div onClick={() => onSelect("supplier")}
-          style={{ background:"#fff", borderRadius:16, padding:36, width:280, cursor:"pointer", boxShadow:"0 20px 60px rgba(0,0,0,.15)", transition:"transform .2s, box-shadow .2s", textAlign:"center" }}
-          onMouseEnter={e => { e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 28px 70px rgba(0,0,0,.2)"; }}
-          onMouseLeave={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 20px 60px rgba(0,0,0,.15)"; }}>
-          <div style={{ fontSize:48, marginBottom:16 }}>🔧</div>
-          <div style={{ fontSize:20, fontWeight:700, color:T.text, marginBottom:8 }}>Login as Supplier</div>
-          <div style={{ fontSize:13, color:T.textSub, lineHeight:1.6, marginBottom:20 }}>Vendor Application Engineer — Upload your product catalogue to make it available for OEM evaluation</div>
+          style={{ background:"rgba(255,255,255,.97)", borderRadius:16, padding:32, width:260, cursor:"pointer",
+            boxShadow:"0 20px 60px rgba(0,0,0,.3)", transition:"transform .2s, box-shadow .2s", textAlign:"center" }}
+          onMouseEnter={e => { e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 28px 70px rgba(0,0,0,.4)"; }}
+          onMouseLeave={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 20px 60px rgba(0,0,0,.3)"; }}>
+          <div style={{ fontSize:44, marginBottom:12 }}>🔧</div>
+          <div style={{ fontSize:18, fontWeight:700, color:T.text, marginBottom:8 }}>Login as Supplier</div>
+          <div style={{ fontSize:12, color:T.textSub, lineHeight:1.6, marginBottom:18 }}>Vendor Application Engineer — Upload your product catalogue to make it available for OEM evaluation</div>
           <div style={{ background:T.success, color:"#fff", padding:"10px 24px", borderRadius:8, fontSize:13, fontWeight:600 }}>Enter as Supplier →</div>
         </div>
       </div>
 
+      <style>{`
+        @keyframes roadDash {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-100px); }
+        }
+      `}</style>
     </div>
   );
 }
