@@ -49,8 +49,10 @@ function HeroPage({ onSelect }) {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
-    const W = canvas.width  = canvas.offsetWidth;
-    const H = canvas.height = canvas.offsetHeight;
+    canvas.style.width  = "100%";
+    canvas.style.height = "100%";
+    const W = canvas.width  = window.innerWidth;
+    const H = canvas.height = window.innerHeight;
 
     let carX      = -420;
     const carY    = H * 0.55;
@@ -494,16 +496,15 @@ function HeroPage({ onSelect }) {
         setPhase("reveal");
       }
 
-      if (t < 1 || phase === "intro") {
-        animRef.current = requestAnimationFrame(loop);
-      }
+      // Keep running road animation after car stops
+      animRef.current = requestAnimationFrame(loop);
     };
 
     animRef.current = requestAnimationFrame(loop);
 
     const resize = () => {
-      canvas.width  = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
     };
     window.addEventListener("resize", resize);
     return () => {
