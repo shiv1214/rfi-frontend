@@ -183,7 +183,182 @@ function SupplierPortal({ onBack }) {
             Your catalogue will be available for TML's evaluation system. TML engineers will be able to select your company and run an automated multi-variant compliance evaluation against their RFI requirements.
           </div>
         </div>
+
+        {/* View past conversations */}
+        {(status==="done"||companyName) && (
+          <SupplierConversations companyName={companyName} />
+        )}
       </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SUPPLIER CONVERSATIONS VIEW
+// ══════════════════════════════════════════════════════════════════
+function SupplierConversations({ companyName }) {
+  const [convs, setConvs]     = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selConv, setSelConv] = useState(null);
+  const [convData, setConvData] = useState(null);
+  const [loadingConv, setLoadingConv] = useState(false);
+
+  const load = async () => {
+    if (!companyName?.trim()) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`${SERVER}/conversations/${encodeURIComponent(companyName)}`);
+      const d = await r.json();
+      setConvs(d.conversations || []);
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  useEffect(() => { if(companyName) load(); }, [companyName]);
+
+  const openConv = async (id) => {
+    setSelConv(id); setLoadingConv(true);
+    try {
+      const r = await fetch(`${SERVER}/conversation/${id}`);
+      const d = await r.json();
+      setConvData(d);
+    } catch(e) { console.error(e); }
+    setLoadingConv(false);
+  };
+
+  if (!companyName?.trim()) return null;
+
+  return (
+    <div style={{ marginTop:24 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+        <div style={{ fontSize:15, fontWeight:700, color:T.text }}>Past Evaluations</div>
+        <button onClick={load} style={{ background:T.surface2, border:`1px solid ${T.border}`, borderRadius:6, padding:"4px 12px", fontSize:11, cursor:"pointer", color:T.textSub }}>↻ Refresh</button>
+      </div>
+
+      {loading && <div style={{ fontSize:12, color:T.textMuted, padding:12 }}>Loading…</div>}
+
+      {!loading && convs.length===0 && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, padding:20, textAlign:"center" }}>
+          <div style={{ fontSize:24, marginBottom:8 }}>📭</div>
+          <div style={{ fontSize:12, color:T.textSub }}>No evaluations yet for {companyName}</div>
+        </div>
+      )}
+
+      {convs.map(c => (
+        <div key={c.id} onClick={() => openConv(c.id)}
+          style={{ background:T.surface, border:`1px solid ${selConv===c.id?T.primary:T.border}`, borderRadius:10, padding:14, marginBottom:8, cursor:"pointer", boxShadow:"0 1px 4px rgba(0,0,0,.04)" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+            <div style={{ fontSize:13, fontWeight:600, color:T.text }}>Evaluation — {new Date(c.savedAt).toLocaleDateString("en-IN", {day:"numeric",month:"short",year:"numeric"})}</div>
+            <div style={{ fontSize:11, color:T.textSub }}>{new Date(c.savedAt).toLocaleTimeString("en-IN", {hour:"2-digit",minute:"2-digit"})}</div>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <span style={{ fontSize:11, padding:"2px 8px", borderRadius:20, background:T.successBg, color:T.success, fontWeight:600 }}>{c.summary?.active||0} Active</span>
+            {(c.summary?.eliminated||0)>0 && <span style={{ fontSize:11, padding:"2px 8px", borderRadius:20, background:T.dangerBg, color:T.danger, fontWeight:600 }}>{c.summary.eliminated} Eliminated</span>}
+          </div>
+        </div>
+      ))}
+
+      {/* Conversation detail modal — supplier POV */}
+      {selConv && convData && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300, padding:16 }}>
+          <div style={{ background:T.surface, borderRadius:14, width:"100%", maxWidth:700, maxHeight:"90vh", display:"flex", flexDirection:"column", overflow:"hidden", boxShadow:"0 24px 80px rgba(0,0,0,.2)" }}>
+
+            {/* Modal header */}
+            <div style={{ padding:"14px 20px", borderBottom:`1px solid ${T.border}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:T.text }}>Evaluation — {new Date(convData.savedAt).toLocaleDateString("en-IN", {day:"numeric",month:"short",year:"numeric"})}</div>
+                <div style={{ fontSize:11, color:T.textSub, marginTop:2 }}>Supplier perspective — your messages on left, TML on right</div>
+              </div>
+              <button onClick={() => { setSelConv(null); setConvData(null); }}
+                style={{ background:T.surface2, border:`1px solid ${T.border}`, borderRadius:6, padding:"6px 14px", fontSize:12, cursor:"pointer", color:T.text }}>Close</button>
+            </div>
+
+            {/* Variant results summary */}
+            {convData.variantResults?.length>0 && (
+              <div style={{ padding:"10px 16px", borderBottom:`1px solid ${T.border}`, display:"flex", gap:8, flexWrap:"wrap" }}>
+                {convData.variantResults.map(v => (
+                  <div key={v.name} style={{ fontSize:11, padding:"3px 10px", borderRadius:20, fontWeight:600,
+                    background:v.status==="active"?T.successBg:T.dangerBg,
+                    color:v.status==="active"?T.success:T.danger }}>
+                    {v.name} — {v.status==="active"?"PASSED":"ELIMINATED"}
+                    {v.status==="active" && ` (MH ${v.mhPassed}/${v.mhTotal})`}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {loadingConv && <div style={{ padding:20, textAlign:"center", color:T.textMuted }}>Loading conversation…</div>}
+
+            {/* Messages — SUPPLIER POV (supplier left, TML right) */}
+            {!loadingConv && (
+              <div style={{ flex:1, overflowY:"auto", padding:16, display:"flex", flexDirection:"column", gap:8 }}>
+                {/* Shared messages (Phase 1) */}
+                {(convData.sharedMessages||[]).filter(m=>m.type==="msg"||m.type==="divider").map(msg => {
+                  if (msg.type==="divider") return (
+                    <div key={msg.id} style={{ display:"flex", alignItems:"center", gap:8, margin:"6px 0" }}>
+                      <div style={{ flex:1, height:1, background:T.border }}/>
+                      <span style={{ fontSize:10, fontWeight:600, color:T.textMuted, whiteSpace:"nowrap" }}>{msg.text}</span>
+                      <div style={{ flex:1, height:1, background:T.border }}/>
+                    </div>
+                  );
+                  // FLIPPED: supplier=left, tml=right
+                  const isSupplier = msg.role==="supplier";
+                  return (
+                    <div key={msg.id} style={{ display:"flex", flexDirection:isSupplier?"row":"row-reverse", gap:8, alignItems:"flex-end" }}>
+                      <div style={{ width:28,height:28,borderRadius:8,background:isSupplier?T.successBg:T.primaryBg,border:`1.5px solid ${isSupplier?T.success:T.primary}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:isSupplier?T.success:T.primary,flexShrink:0 }}>
+                        {isSupplier?"YOU":"TML"}
+                      </div>
+                      <div style={{ maxWidth:"72%" }}>
+                        <div style={{ fontSize:10, color:T.textMuted, marginBottom:3, textAlign:isSupplier?"left":"right" }}>
+                          {isSupplier?"You (Supplier Engineer)":"TML Design Engineer"}
+                        </div>
+                        <div style={{ padding:"10px 14px", borderRadius:10, fontSize:13, lineHeight:1.65,
+                          background:isSupplier?`${T.success}10`:T.surface,
+                          border:`1px solid ${isSupplier?T.success+"30":T.border}`,
+                          color:T.text,
+                          borderTopLeftRadius:isSupplier?2:10, borderTopRightRadius:isSupplier?10:2,
+                          boxShadow:"0 1px 4px rgba(0,0,0,.05)" }}>
+                          {msg.text}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Variant chats */}
+                {Object.entries(convData.variantChats||{}).map(([vname, msgs]) => (
+                  <div key={vname}>
+                    <div style={{ fontSize:11, fontWeight:700, color:T.textSub, margin:"12px 0 6px", paddingLeft:4 }}>— {vname} —</div>
+                    {msgs.filter(m=>m.type==="msg").map(msg => {
+                      const isSupplier = msg.role==="supplier";
+                      return (
+                        <div key={msg.id} style={{ display:"flex", flexDirection:isSupplier?"row":"row-reverse", gap:8, alignItems:"flex-end", marginBottom:8 }}>
+                          <div style={{ width:28,height:28,borderRadius:8,background:isSupplier?T.successBg:T.primaryBg,border:`1.5px solid ${isSupplier?T.success:T.primary}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:isSupplier?T.success:T.primary,flexShrink:0 }}>
+                            {isSupplier?"YOU":"TML"}
+                          </div>
+                          <div style={{ maxWidth:"72%" }}>
+                            <div style={{ fontSize:10, color:T.textMuted, marginBottom:3, textAlign:isSupplier?"left":"right" }}>
+                              {isSupplier?`You — ${vname}`:"TML Design Engineer"}
+                            </div>
+                            <div style={{ padding:"10px 14px", borderRadius:10, fontSize:13, lineHeight:1.65,
+                              background:isSupplier?`${T.success}10`:T.surface,
+                              border:`1px solid ${isSupplier?T.success+"30":T.border}`,
+                              color:T.text,
+                              borderTopLeftRadius:isSupplier?2:10, borderTopRightRadius:isSupplier?10:2,
+                              boxShadow:"0 1px 4px rgba(0,0,0,.05)" }}>
+                              {msg.text}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -256,14 +431,25 @@ function OEMPortal({ onBack }) {
     } catch(e) { console.error(e); }
   };
 
+  const localSharedRef = useRef([]);
+
   const addShared = (role, text, type="msg") => {
     if (!text?.trim()) return;
-    setShared(p => [...p, { role, text:text.trim(), type, id:Date.now()+Math.random() }]);
+    const msg = { role, text:text.trim(), type, id:Date.now()+Math.random() };
+    setShared(p => [...p, msg]);
+    // Also track in ref for save
+    localSharedRef.current.push(msg);
   };
+
+  const localVarChatRef = useRef({});
 
   const addVar = (vn, role, text, type="msg") => {
     if (!text?.trim()) return;
-    setVarChat(p => ({ ...p, [vn]: [...(p[vn]||[]), { role, text:text.trim(), type, id:Date.now()+Math.random() }] }));
+    const msg = { role, text:text.trim(), type, id:Date.now()+Math.random() };
+    setVarChat(p => ({ ...p, [vn]: [...(p[vn]||[]), msg] }));
+    // Also track in ref for save — works synchronously unlike state
+    if (!localVarChatRef.current[vn]) localVarChatRef.current[vn] = [];
+    localVarChatRef.current[vn].push(msg);
   };
 
   const callAI = async (agent, history, extra={}) => {
@@ -298,6 +484,9 @@ function OEMPortal({ onBack }) {
     setShared([]); setVarChat({}); setReport(null);
     setPhase("general");
     setStep("evaluating");
+    // Reset refs for fresh tracking
+    localSharedRef.current = [];
+    localVarChatRef.current = {};
 
     // Get supplier variants
     const supRes = await fetch(`${SERVER}/data/supplier`).then(r=>r.json());
@@ -319,6 +508,7 @@ function OEMPortal({ onBack }) {
     const sharedHist = [];
     const seed = "We have received your RFI submission. Please proceed with your questions about this project.";
     addShared("tml", seed);
+    localSharedRef.current.push({ role:"tml", text:seed, type:"msg", id:Date.now()+Math.random() });
     sharedHist.push({ role:"user", content:seed });
 
     for (let i=0; i<4; i++) {
@@ -328,6 +518,7 @@ function OEMPortal({ onBack }) {
       setTyping(null);
       if (!supQ) continue;
       addShared("supplier", supQ);
+      localSharedRef.current.push({ role:"supplier", text:supQ, type:"msg", id:Date.now()+Math.random() });
       sharedHist.push({ role:"assistant", content:supQ });
       await wait(300);
 
@@ -336,6 +527,7 @@ function OEMPortal({ onBack }) {
       setTyping(null);
       if (!tmlA) continue;
       addShared("tml", tmlA);
+      localSharedRef.current.push({ role:"tml", text:tmlA, type:"msg", id:Date.now()+Math.random() });
       sharedHist.push({ role:"user", content:tmlA });
       await wait(300);
     }
@@ -375,13 +567,19 @@ function OEMPortal({ onBack }) {
         setTyping({ v:v.name, role:"tml" });
         const tmlQ = await callAI("tml", v.history.slice(-4), { phase:"must_have", variant:v.name, reqParam:req.parameter, reqVal:req.requirement });
         setTyping(null);
-        if (tmlQ) { addVar(v.name,"tml",tmlQ); v.history.push({role:"user",content:tmlQ}); }
+        if (tmlQ) { addVar(v.name,"tml",tmlQ); v.history.push({role:"user",content:tmlQ});
+          if(!localVarChatRef.current[v.name]) localVarChatRef.current[v.name]=[];
+          localVarChatRef.current[v.name].push({role:"tml",text:tmlQ,type:"msg",id:Date.now()+Math.random()});
+        }
         await wait(600);
 
         setTyping({ v:v.name, role:"supplier" });
         const supA = await callAI("supplier", v.history.slice(-4), { phase:"must_have", variant:v.name, reqParam:req.parameter, reqVal:req.requirement });
         setTyping(null);
-        if (supA) { addVar(v.name,"supplier",supA); v.history.push({role:"assistant",content:supA}); }
+        if (supA) { addVar(v.name,"supplier",supA); v.history.push({role:"assistant",content:supA});
+          if(!localVarChatRef.current[v.name]) localVarChatRef.current[v.name]=[];
+          localVarChatRef.current[v.name].push({role:"supplier",text:supA,type:"msg",id:Date.now()+Math.random()});
+        }
         await wait(600);
 
         if (!passes) {
@@ -427,7 +625,11 @@ function OEMPortal({ onBack }) {
         setTyping({ v:v.name, role:"tml" });
         const tmlQ2 = await callAI("tml", gthCtx, { phase:"good_to_have", variant:v.name, reqParam:req.parameter, reqVal:req.requirement });
         setTyping(null);
-        if (tmlQ2) addVar(v.name,"tml",tmlQ2);
+        if (tmlQ2) {
+          addVar(v.name,"tml",tmlQ2);
+          if(!localVarChatRef.current[v.name]) localVarChatRef.current[v.name]=[];
+          localVarChatRef.current[v.name].push({role:"tml",text:tmlQ2,type:"msg",id:Date.now()+Math.random()});
+        }
         await wait(500);
 
         const supGthCtx = [...gthCtx, {role:"user",content:tmlQ2||`Regarding ${req.parameter} — our preference is ${req.requirement}. What does your variant offer?`}];
@@ -439,6 +641,8 @@ function OEMPortal({ onBack }) {
           addVar(v.name,"supplier",supA);
           v.history.push({role:"user",content:`[GTH] ${req.parameter}: ${tmlQ2||req.requirement}`});
           v.history.push({role:"assistant",content:supA});
+          if(!localVarChatRef.current[v.name]) localVarChatRef.current[v.name]=[];
+          localVarChatRef.current[v.name].push({role:"supplier",text:supA,type:"msg",id:Date.now()+Math.random()});
         }
 
         const miss = ["does not","below","non compliant","not meet","unable","not available"].some(w=>supA.toLowerCase().includes(w));
@@ -462,12 +666,18 @@ function OEMPortal({ onBack }) {
         setTyping({v:v.name,role:"tml"});
         const q = await callAI("tml",v.history,{phase:"negotiation",variant:v.name});
         setTyping(null);
-        if (q) { addVar(v.name,"tml",q); v.history.push({role:"user",content:q}); }
+        if (q) { addVar(v.name,"tml",q); v.history.push({role:"user",content:q});
+          if(!localVarChatRef.current[v.name]) localVarChatRef.current[v.name]=[];
+          localVarChatRef.current[v.name].push({role:"tml",text:q,type:"msg",id:Date.now()+Math.random()});
+        }
         await wait(300);
         setTyping({v:v.name,role:"supplier"});
         const a = await callAI("supplier",v.history,{phase:"negotiation",variant:v.name});
         setTyping(null);
-        if (a) { addVar(v.name,"supplier",a); v.history.push({role:"assistant",content:a}); }
+        if (a) { addVar(v.name,"supplier",a); v.history.push({role:"assistant",content:a});
+          if(!localVarChatRef.current[v.name]) localVarChatRef.current[v.name]=[];
+          localVarChatRef.current[v.name].push({role:"supplier",text:a,type:"msg",id:Date.now()+Math.random()});
+        }
         await wait(300);
       }
     }
@@ -482,16 +692,44 @@ function OEMPortal({ onBack }) {
       setTyping({v:v.name,role:"tml"});
       const q = await callAI("tml",v.history,{phase:"recommendation",variant:v.name});
       setTyping(null);
-      if (q) { addVar(v.name,"tml",q); v.history.push({role:"user",content:q}); }
+      if (q) { addVar(v.name,"tml",q); v.history.push({role:"user",content:q});
+        if(!localVarChatRef.current[v.name]) localVarChatRef.current[v.name]=[];
+        localVarChatRef.current[v.name].push({role:"tml",text:q,type:"msg",id:Date.now()+Math.random()});
+      }
       await wait(300);
       setTyping({v:v.name,role:"supplier"});
       const a = await callAI("supplier",v.history,{phase:"recommendation",variant:v.name});
       setTyping(null);
-      if (a) { addVar(v.name,"supplier",a); v.history.push({role:"assistant",content:a}); }
+      if (a) { addVar(v.name,"supplier",a); v.history.push({role:"assistant",content:a});
+        if(!localVarChatRef.current[v.name]) localVarChatRef.current[v.name]=[];
+        localVarChatRef.current[v.name].push({role:"supplier",text:a,type:"msg",id:Date.now()+Math.random()});
+      }
       await wait(300);
     }
 
     setPhase("complete"); setLoading(false); setTyping(null);
+
+    // Auto-save — use localShared and localVarChat (accumulated during eval)
+    if (selSupplier) {
+      try {
+        await fetch(`${SERVER}/api/save-conversation`, {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({
+            supplierName: selSupplier.name,
+            sharedMessages: localSharedRef.current,
+            variantChats: localVarChatRef.current,
+            variantResults: vStateRef.current.map(v=>({
+              name:v.name, status:v.status,
+              mhPassed:v.mhPassed, mhTotal:v.mhTotal,
+              gthMatched:v.gthMatched||0, gthTotal:v.gthTotal,
+              deviations:v.deviations,
+              eliminatedAt:v.eliminatedAt, eliminationReason:v.eliminationReason
+            }))
+          })
+        });
+        console.log("✅ Conversation saved — shared:", localSharedRef.current.length, "variants:", Object.keys(localVarChatRef.current).join(", "));
+      } catch(e) { console.error("Save failed:", e); }
+    }
   };
 
   const generateReport = async () => {
