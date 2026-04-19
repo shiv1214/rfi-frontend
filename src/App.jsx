@@ -37,534 +37,335 @@ const VC = { Alpha:T.primary, Beta:T.warning, Gamma:T.success, Lambda:T.purple }
 const vc = n => VC[n] || T.textSub;
 
 // ══════════════════════════════════════════════════════════════════
-// HERO / LANDING PAGE — Full cinematic car animation
+// HERO / LANDING PAGE — CSS animation (no canvas bugs)
 // ══════════════════════════════════════════════════════════════════
 function HeroPage({ onSelect }) {
-  const canvasRef = useRef(null);
-  const [phase, setPhase] = useState("intro"); // intro | reveal | done
-  const animRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-
-    canvas.style.width  = "100%";
-    canvas.style.height = "100%";
-    const W = canvas.width  = window.innerWidth;
-    const H = canvas.height = window.innerHeight;
-
-    let carX      = -420;
-    const carY    = H * 0.55;
-    const carW    = 320;
-    const carH    = 110;
-    let speed     = 0;
-    let tick      = 0;
-    let particles = [];
-    let sparks    = [];
-    let done      = false;
-
-    // Spawn spark particles from wheels
-    const spawnSpark = (x, y) => {
-      for (let i = 0; i < 3; i++) {
-        sparks.push({
-          x, y,
-          vx: (Math.random() - 0.8) * 4,
-          vy: (Math.random() - 0.5) * 3 - 1,
-          life: 1, size: Math.random() * 2.5 + 0.5,
-          col: Math.random() > 0.5 ? "#FFD700" : "#FF8C00"
-        });
-      }
-    };
-
-    // Road particles (dust)
-    const spawnDust = (x, y) => {
-      particles.push({
-        x, y,
-        vx: -(speed * 0.3 + Math.random() * 2),
-        vy: (Math.random() - 0.5) * 0.8,
-        life: 1, size: Math.random() * 6 + 2, alpha: 0.18
-      });
-    };
-
-    const drawSUV = (x, y, wheelRot) => {
-      ctx.save();
-      ctx.translate(x, y);
-
-      // ── Shadow ──
-      ctx.save();
-      ctx.scale(1, 0.2);
-      const sg = ctx.createRadialGradient(carW/2, carH*5, 10, carW/2, carH*5, carW*0.6);
-      sg.addColorStop(0, "rgba(0,0,0,0.55)");
-      sg.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = sg;
-      ctx.beginPath();
-      ctx.ellipse(carW/2, carH*5.2, carW*0.55, carH*1.8, 0, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-
-      // ── Underbody ──
-      ctx.fillStyle = "#0a1628";
-      ctx.beginPath();
-      ctx.roundRect(18, carH-18, carW-36, 22, 4);
-      ctx.fill();
-
-      // ── Body main ──
-      const bodyGrad = ctx.createLinearGradient(0, 15, 0, carH-15);
-      bodyGrad.addColorStop(0, "#1e3a6e");
-      bodyGrad.addColorStop(0.35, "#1a5fa8");
-      bodyGrad.addColorStop(0.7, "#163d7a");
-      bodyGrad.addColorStop(1, "#0d2040");
-      ctx.fillStyle = bodyGrad;
-      ctx.beginPath();
-      ctx.moveTo(30, carH-14);
-      ctx.lineTo(15, carH-28);
-      ctx.lineTo(15, carH-45);
-      ctx.lineTo(22, carH-55);
-      ctx.lineTo(55, carH-75); // hood slope
-      ctx.lineTo(80, carH-80);
-      ctx.lineTo(240, carH-80); // roofline
-      ctx.lineTo(272, carH-65);
-      ctx.lineTo(285, carH-50);
-      ctx.lineTo(290, carH-28);
-      ctx.lineTo(282, carH-14);
-      ctx.closePath();
-      ctx.fill();
-
-      // ── Roof highlight ──
-      const rg = ctx.createLinearGradient(80, 0, 240, 0);
-      rg.addColorStop(0, "rgba(255,255,255,0)");
-      rg.addColorStop(0.3, "rgba(255,255,255,0.12)");
-      rg.addColorStop(0.7, "rgba(255,255,255,0.09)");
-      rg.addColorStop(1, "rgba(255,255,255,0)");
-      ctx.fillStyle = rg;
-      ctx.beginPath();
-      ctx.moveTo(80, carH-80);
-      ctx.lineTo(240, carH-80);
-      ctx.lineTo(240, carH-65);
-      ctx.lineTo(80, carH-65);
-      ctx.closePath();
-      ctx.fill();
-
-      // ── Windshield ──
-      ctx.fillStyle = "rgba(100,180,255,0.45)";
-      ctx.strokeStyle = "rgba(255,255,255,0.2)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(82, carH-79);
-      ctx.lineTo(115, carH-55);
-      ctx.lineTo(178, carH-55);
-      ctx.lineTo(180, carH-79);
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
-
-      // ── Side windows ──
-      ctx.fillStyle = "rgba(80,160,255,0.35)";
-      ctx.beginPath();
-      ctx.moveTo(182, carH-79);
-      ctx.lineTo(182, carH-55);
-      ctx.lineTo(230, carH-55);
-      ctx.lineTo(238, carH-69);
-      ctx.lineTo(238, carH-79);
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
-
-      // Rear window
-      ctx.beginPath();
-      ctx.moveTo(240, carH-79);
-      ctx.lineTo(240, carH-55);
-      ctx.lineTo(258, carH-57);
-      ctx.lineTo(268, carH-65);
-      ctx.lineTo(262, carH-79);
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
-
-      // ── Grill ──
-      ctx.fillStyle = "#050e1c";
-      ctx.beginPath();
-      ctx.roundRect(272, carH-52, 18, 22, 2);
-      ctx.fill();
-      for (let i = 0; i < 4; i++) {
-        ctx.strokeStyle = "rgba(255,255,255,0.15)";
-        ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(273, carH-50+i*5);
-        ctx.lineTo(289, carH-50+i*5);
-        ctx.stroke();
-      }
-
-      // ── Headlights ──
-      const hl = ctx.createRadialGradient(291, carH-44, 0, 291, carH-44, 14);
-      hl.addColorStop(0, "#ffffff");
-      hl.addColorStop(0.3, "#ffe87a");
-      hl.addColorStop(1, "rgba(255,220,80,0)");
-      ctx.fillStyle = hl;
-      ctx.beginPath();
-      ctx.ellipse(291, carH-44, 10, 7, 0, 0, Math.PI*2);
-      ctx.fill();
-
-      // DRL strip
-      ctx.strokeStyle = "#87ceeb";
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(278, carH-56);
-      ctx.lineTo(292, carH-56);
-      ctx.stroke();
-
-      // ── Tail lights ──
-      ctx.fillStyle = "#cc1111";
-      ctx.beginPath();
-      ctx.roundRect(14, carH-52, 9, 18, 2);
-      ctx.fill();
-      ctx.fillStyle = "rgba(255,60,60,0.7)";
-      ctx.beginPath();
-      ctx.roundRect(15, carH-51, 6, 14, 1);
-      ctx.fill();
-
-      // ── Door lines ──
-      ctx.strokeStyle = "rgba(255,255,255,0.08)";
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(183, carH-54); ctx.lineTo(180, carH-14); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(113, carH-54); ctx.lineTo(115, carH-14); ctx.stroke();
-
-      // ── Roof rack ──
-      ctx.strokeStyle = "rgba(255,255,255,0.25)";
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(95, carH-81);
-      ctx.lineTo(235, carH-81);
-      ctx.stroke();
-      [110, 150, 190, 220].forEach(rx => {
-        ctx.beginPath();
-        ctx.moveTo(rx, carH-81);
-        ctx.lineTo(rx, carH-78);
-        ctx.stroke();
-      });
-
-      // ── Side mirror ──
-      ctx.fillStyle = "#0e2444";
-      ctx.beginPath();
-      ctx.roundRect(265, carH-66, 14, 8, 2);
-      ctx.fill();
-
-      // ── Wheels ──
-      const drawWheel = (wx, wy, rot) => {
-        ctx.save();
-        ctx.translate(wx, wy);
-
-        // Tire
-        ctx.fillStyle = "#0a0a0a";
-        ctx.beginPath();
-        ctx.arc(0, 0, 28, 0, Math.PI*2);
-        ctx.fill();
-
-        // Rim outer
-        ctx.fillStyle = "#2a2a2a";
-        ctx.beginPath();
-        ctx.arc(0, 0, 22, 0, Math.PI*2);
-        ctx.fill();
-
-        // Rim spokes
-        ctx.save();
-        ctx.rotate(rot);
-        for (let i = 0; i < 5; i++) {
-          ctx.save();
-          ctx.rotate((i * Math.PI * 2) / 5);
-          ctx.fillStyle = "#c8c8c8";
-          ctx.beginPath();
-          ctx.roundRect(-3, -20, 6, 16, 2);
-          ctx.fill();
-          ctx.restore();
-        }
-        ctx.restore();
-
-        // Center cap
-        ctx.fillStyle = "#888";
-        ctx.beginPath();
-        ctx.arc(0, 0, 7, 0, Math.PI*2);
-        ctx.fill();
-        ctx.fillStyle = "#1971C2";
-        ctx.beginPath();
-        ctx.arc(0, 0, 4, 0, Math.PI*2);
-        ctx.fill();
-
-        // Brake disc hint
-        ctx.strokeStyle = "rgba(180,180,180,0.2)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(0, 0, 14, 0, Math.PI*2);
-        ctx.stroke();
-
-        ctx.restore();
-      };
-
-      drawWheel(68, carH-14, wheelRot);
-      drawWheel(238, carH-14, wheelRot);
-
-      // ── Side skirt detail ──
-      ctx.fillStyle = "rgba(0,0,0,0.35)";
-      ctx.beginPath();
-      ctx.roundRect(25, carH-20, carW-50, 8, 2);
-      ctx.fill();
-
-      ctx.restore();
-    };
-
-    const drawBeams = (x, y) => {
-      // Left beam
-      ctx.save();
-      const b1 = ctx.createConicalGradient
-        ? ctx.createConicalGradient(x+290, y+carH-44, -0.18, 0.18)
-        : null;
-
-      // Fallback triangle beams
-      const bx = x + 295;
-      const by = y + carH - 44;
-      [[-0.22, 0.22], [-0.10, 0.10]].forEach(([a1, a2], i) => {
-        const len = i === 0 ? 420 : 280;
-        const spread = i === 0 ? 0.22 : 0.10;
-        const grad = ctx.createLinearGradient(bx, by, bx + len, by);
-        grad.addColorStop(0, i === 0 ? "rgba(255,230,120,0.18)" : "rgba(255,240,180,0.28)");
-        grad.addColorStop(1, "rgba(255,230,120,0)");
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.moveTo(bx, by);
-        ctx.lineTo(bx + len, by - len*spread);
-        ctx.lineTo(bx + len, by + len*spread);
-        ctx.closePath();
-        ctx.fill();
-      });
-
-      // Bright core dot
-      const hg = ctx.createRadialGradient(bx, by, 0, bx, by, 25);
-      hg.addColorStop(0, "rgba(255,255,255,0.9)");
-      hg.addColorStop(0.3, "rgba(255,230,100,0.4)");
-      hg.addColorStop(1, "rgba(255,200,0,0)");
-      ctx.fillStyle = hg;
-      ctx.beginPath();
-      ctx.arc(bx, by, 25, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-    };
-
-    const drawSpeedLines = (x) => {
-      for (let i = 0; i < 12; i++) {
-        const ly  = H * 0.25 + i * H * 0.045;
-        const lx1 = x - 60 - Math.random() * 200;
-        const lx2 = lx1 - (30 + Math.random() * 120);
-        const alpha = 0.06 + Math.random() * 0.12;
-        ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
-        ctx.lineWidth = 0.5 + Math.random() * 1.5;
-        ctx.beginPath();
-        ctx.moveTo(lx1, ly);
-        ctx.lineTo(lx2, ly);
-        ctx.stroke();
-      }
-    };
-
-    const drawRoad = () => {
-      // Road base
-      const rg = ctx.createLinearGradient(0, carY+carH, 0, H);
-      rg.addColorStop(0, "#111827");
-      rg.addColorStop(1, "#0a0f1a");
-      ctx.fillStyle = rg;
-      ctx.fillRect(0, carY+carH-10, W, H - (carY+carH-10));
-
-      // Road surface texture line
-      ctx.strokeStyle = "rgba(255,255,255,0.06)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, carY+carH+2);
-      ctx.lineTo(W, carY+carH+2);
-      ctx.stroke();
-
-      // Center dashes
-      const dashW = 60, gap = 40, total = dashW + gap;
-      const offset = (tick * speed * 0.5) % total;
-      ctx.fillStyle = "rgba(255,255,255,0.22)";
-      for (let dx = -total + offset; dx < W + total; dx += total) {
-        ctx.fillRect(dx - offset, carY + carH + 18, dashW, 4);
-      }
-
-      // Edge lines
-      ctx.strokeStyle = "rgba(255,255,255,0.12)";
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(0, carY+carH+8); ctx.lineTo(W, carY+carH+8); ctx.stroke();
-    };
-
-    const drawParticles = () => {
-      particles = particles.filter(p => p.life > 0);
-      particles.forEach(p => {
-        p.x += p.vx; p.y += p.vy; p.life -= 0.025;
-        ctx.fillStyle = `rgba(180,180,200,${p.life * p.alpha})`;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
-        ctx.fill();
-      });
-
-      sparks = sparks.filter(s => s.life > 0);
-      sparks.forEach(s => {
-        s.x += s.vx; s.y += s.vy; s.vy += 0.15; s.life -= 0.06;
-        ctx.fillStyle = s.col;
-        ctx.globalAlpha = s.life;
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.size * s.life, 0, Math.PI*2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      });
-    };
-
-    let startTime = null;
-    const DRIVE_MS    = 1800; // ms to drive in
-    const BRAKE_MS    = 400;  // ms to brake to stop
-    const STOP_X      = W * 0.38; // where car stops
-
-    const loop = (ts) => {
-      if (!startTime) startTime = ts;
-      const elapsed = ts - startTime;
-      tick++;
-
-      // Clear
-      ctx.clearRect(0, 0, W, H);
-
-      // Background
-      const bg = ctx.createLinearGradient(0, 0, W, H);
-      bg.addColorStop(0, "#060d1a");
-      bg.addColorStop(0.5, "#0a1628");
-      bg.addColorStop(1, "#06101f");
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, W, H);
-
-      // Stars
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      for (let i = 0; i < 60; i++) {
-        const sx = (i * 137.5 + 50) % W;
-        const sy = (i * 97.3 + 30) % (H * 0.55);
-        const ss = (i % 3 === 0) ? 1.2 : 0.6;
-        ctx.beginPath();
-        ctx.arc(sx, sy, ss, 0, Math.PI*2);
-        ctx.fill();
-      }
-
-      // City silhouette
-      ctx.fillStyle = "rgba(255,255,255,0.04)";
-      [
-        [W*0.05,H*0.4,40,H*0.15],[W*0.1,H*0.38,30,H*0.17],
-        [W*0.18,H*0.35,50,H*0.2],[W*0.28,H*0.37,35,H*0.18],
-        [W*0.38,H*0.32,60,H*0.23],[W*0.52,H*0.36,40,H*0.19],
-        [W*0.62,H*0.33,55,H*0.22],[W*0.72,H*0.38,30,H*0.17],
-        [W*0.82,H*0.35,45,H*0.2],[W*0.9,H*0.39,35,H*0.16],
-      ].forEach(([bx,by,bw,bh]) => {
-        ctx.fillRect(bx, by, bw, bh);
-      });
-
-      // Ease in car
-      let t = Math.min(elapsed / DRIVE_MS, 1);
-      const ease = t < 0.7 
-        ? (t / 0.7) * (t / 0.7)  // accelerate
-        : 1 - Math.pow((t - 0.7) / 0.3, 2); // decelerate
-      carX = -420 + ease * (STOP_X + 420);
-      speed = Math.max(0, (1 - Math.abs(ease - 0.5) * 2) * 18 + 2);
-
-      const wheelRot = -(tick * speed * 0.04);
-
-      drawRoad();
-      drawSpeedLines(carX);
-
-      // Dust from rear wheel while moving
-      if (speed > 3 && tick % 2 === 0) {
-        spawnDust(carX + 68, carY + carH - 6);
-      }
-      // Sparks when braking
-      if (t > 0.75 && t < 0.95 && tick % 3 === 0) {
-        spawnSpark(carX + 68, carY + carH - 6);
-        spawnSpark(carX + 238, carY + carH - 6);
-      }
-
-      drawParticles();
-
-      // Headlight beams when close
-      if (carX > -100) drawBeams(carX, carY);
-
-      drawSUV(carX, carY, wheelRot);
-
-      // Reveal KAVACH text after car stops
-      if (t >= 1 && !done) {
-        done = true;
-        setPhase("reveal");
-      }
-
-      // Keep running road animation after car stops
-      animRef.current = requestAnimationFrame(loop);
-    };
-
-    animRef.current = requestAnimationFrame(loop);
-
-    const resize = () => {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    window.addEventListener("resize", resize);
-    return () => {
-      cancelAnimationFrame(animRef.current);
-      window.removeEventListener("resize", resize);
-    };
-  }, []);
-
   return (
-    <div style={{ position:"relative", width:"100vw", height:"100vh", overflow:"hidden", fontFamily:"'Segoe UI',sans-serif" }}>
+    <div style={{ position:"relative", width:"100vw", height:"100vh", overflow:"hidden",
+      background:"linear-gradient(160deg, #060d1a 0%, #0a1628 50%, #06101f 100%)",
+      fontFamily:"'Segoe UI',sans-serif" }}>
 
-      {/* Canvas */}
-      <canvas ref={canvasRef} style={{ position:"absolute", inset:0, width:"100%", height:"100%" }}/>
+      <style>{`
+        @keyframes driveIn {
+          0%   { transform: translateX(-480px); }
+          100% { transform: translateX(0px); }
+        }
+        @keyframes carStop {
+          0%   { transform: translateX(0px); }
+          60%  { transform: translateX(18px); }
+          80%  { transform: translateX(-4px); }
+          100% { transform: translateX(0px); }
+        }
+        @keyframes fadeUp {
+          0%   { opacity:0; transform: translateY(28px); }
+          100% { opacity:1; transform: translateY(0); }
+        }
+        @keyframes fadeDown {
+          0%   { opacity:0; transform: translateY(-20px); }
+          100% { opacity:1; transform: translateY(0); }
+        }
+        @keyframes roadMove {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-100px); }
+        }
+        @keyframes beamPulse {
+          0%,100% { opacity:0.7; }
+          50%      { opacity:1; }
+        }
+        @keyframes sparkFly1 {
+          0%   { transform: translate(0,0) scale(1); opacity:1; }
+          100% { transform: translate(-40px, -30px) scale(0); opacity:0; }
+        }
+        @keyframes sparkFly2 {
+          0%   { transform: translate(0,0) scale(1); opacity:1; }
+          100% { transform: translate(-20px, -45px) scale(0); opacity:0; }
+        }
+        @keyframes sparkFly3 {
+          0%   { transform: translate(0,0) scale(1); opacity:1; }
+          100% { transform: translate(-60px, -20px) scale(0); opacity:0; }
+        }
+        @keyframes glowPulse {
+          0%,100% { text-shadow: 0 0 40px rgba(100,180,255,0.4), 0 0 80px rgba(25,113,194,0.2); }
+          50%      { text-shadow: 0 0 60px rgba(100,180,255,0.7), 0 0 120px rgba(25,113,194,0.4); }
+        }
+        .hero-car {
+          animation: driveIn 1.6s cubic-bezier(0.25,0.46,0.45,0.94) forwards,
+                     carStop 0.5s ease-in-out 1.6s forwards;
+        }
+        .hero-beams {
+          animation: driveIn 1.6s cubic-bezier(0.25,0.46,0.45,0.94) forwards,
+                     beamPulse 2s ease-in-out 1.6s infinite;
+        }
+        .hero-sparks {
+          animation: fadeUp 0.1s ease 1.55s both;
+        }
+        .spark1 { animation: sparkFly1 0.6s ease-out 1.6s both; }
+        .spark2 { animation: sparkFly2 0.5s ease-out 1.65s both; }
+        .spark3 { animation: sparkFly3 0.7s ease-out 1.62s both; }
+        .spark4 { animation: sparkFly1 0.55s ease-out 1.7s both; }
+        .spark5 { animation: sparkFly2 0.65s ease-out 1.68s both; }
+        .hero-title {
+          animation: fadeDown 0.9s cubic-bezier(0.16,1,0.3,1) 2.2s both,
+                     glowPulse 3s ease-in-out 3.2s infinite;
+        }
+        .hero-sub   { animation: fadeUp 0.8s ease 2.5s both; }
+        .hero-cards { animation: fadeUp 0.9s cubic-bezier(0.16,1,0.3,1) 2.8s both; }
+        .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; }
+        .card-hover:hover { transform: translateY(-6px) scale(1.02) !important; }
+      `}</style>
 
-      {/* KAVACH reveal */}
-      <div style={{
-        position:"absolute", top:"12%", left:0, right:0, textAlign:"center", zIndex:10,
-        opacity: phase==="reveal" ? 1 : 0,
-        transform: phase==="reveal" ? "translateY(0) scale(1)" : "translateY(-30px) scale(0.9)",
-        transition: "opacity 1s ease, transform 1s ease",
-      }}>
-        <div style={{ fontSize:"clamp(48px,8vw,90px)", fontWeight:900, color:"#fff", letterSpacing:"-2px",
-          textShadow:"0 0 60px rgba(100,180,255,0.5), 0 0 120px rgba(25,113,194,0.3)" }}>
+      {/* Stars */}
+      <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%", pointerEvents:"none" }}>
+        {[...Array(70)].map((_,i) => (
+          <circle key={i}
+            cx={`${(i*137.5+50)%100}%`}
+            cy={`${(i*97.3+20)%(55)}%`}
+            r={i%5===0?1.3:i%3===0?0.9:0.5}
+            fill="white" opacity={i%4===0?0.8:0.4}/>
+        ))}
+      </svg>
+
+      {/* City silhouette */}
+      <svg style={{ position:"absolute", bottom:"38%", left:0, width:"100%", height:"25%", pointerEvents:"none" }}>
+        {[
+          [3,60,45,100],[7,40,30,110],[12,55,55,90],[18,35,40,105],
+          [23,65,60,85],[29,45,35,100],[35,70,50,80],[41,40,40,100],
+          [47,58,45,92],[53,50,35,105],[60,62,55,88],[68,42,38,100],
+          [73,55,48,92],[79,38,32,108],[85,60,50,90],[91,45,40,100],[96,50,35,100]
+        ].map(([x,y,w,h],i) => (
+          <rect key={i} x={`${x}%`} y={`${y}%`} width={`${w}px`} height={`${h}%`}
+            fill={`rgba(255,255,255,${0.03+i%3*0.01})`}/>
+        ))}
+      </svg>
+
+      {/* Road */}
+      <div style={{ position:"absolute", bottom:"32%", left:0, right:0 }}>
+        <div style={{ height:2, background:"rgba(255,255,255,0.12)" }}/>
+        {/* Moving dashes */}
+        <div style={{ height:4, overflow:"hidden", position:"relative" }}>
+          <div style={{ display:"flex", gap:40, animation:"roadMove 0.5s linear infinite", width:"200%", height:"100%", alignItems:"center" }}>
+            {[...Array(35)].map((_,i) => (
+              <div key={i} style={{ width:60, height:4, background:"rgba(255,255,255,0.25)", flexShrink:0 }}/>
+            ))}
+          </div>
+        </div>
+        <div style={{ height:2, background:"rgba(255,255,255,0.06)" }}/>
+      </div>
+
+      {/* Road surface */}
+      <div style={{ position:"absolute", left:0, right:0, bottom:0, height:"32%",
+        background:"linear-gradient(180deg, #111827 0%, #0a0f1a 100%)" }}/>
+
+
+
+      {/* Car */}
+      <div className="hero-car" style={{ position:"absolute", bottom:"32%", left:"calc(50% - 180px)" }}>
+
+        {/* Sparks at wheel positions */}
+        <div className="hero-sparks">
+          {[
+            {cls:"spark1",x:88,col:"#FFD700"},{cls:"spark2",x:92,col:"#FF8C00"},
+            {cls:"spark3",x:82,col:"#FFD700"},{cls:"spark4",x:298,col:"#FF8C00"},
+            {cls:"spark5",x:305,col:"#FFD700"},
+          ].map((s,i) => (
+            <div key={i} className={s.cls} style={{
+              position:"absolute", bottom:22, left:s.x,
+              width:5, height:5, borderRadius:"50%", background:s.col,
+              pointerEvents:"none"
+            }}/>
+          ))}
+        </div>
+
+        {/* SUV SVG — proper proportions */}
+        <svg width="820" height="130" viewBox="0 0 820 130" style={{ display:"block", filter:"drop-shadow(0 10px 28px rgba(0,0,0,0.7))" }}>
+          <defs>
+            <linearGradient id="bodyG" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2952a3"/>
+              <stop offset="30%" stopColor="#1e6fc4"/>
+              <stop offset="70%" stopColor="#163d7a"/>
+              <stop offset="100%" stopColor="#0d2040"/>
+            </linearGradient>
+            <linearGradient id="hoodG" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#1e6fc4"/>
+              <stop offset="100%" stopColor="#163d7a"/>
+            </linearGradient>
+            <linearGradient id="roofShine" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(255,255,255,0.22)"/>
+              <stop offset="100%" stopColor="rgba(255,255,255,0)"/>
+            </linearGradient>
+          </defs>
+
+          {/* Ground shadow */}
+          <ellipse cx="200" cy="126" rx="175" ry="7" fill="rgba(0,0,0,0.5)"/>
+
+          {/* === CHASSIS / UNDERBODY === */}
+          <rect x="35" y="98" width="340" height="12" rx="4" fill="#06101e"/>
+
+          {/* === MAIN BODY (boxy SUV) === */}
+          {/* Rear quarter */}
+          <path d="M38 98 L32 88 L32 52 L38 46 L38 98 Z" fill="#0d2040"/>
+          {/* Body side */}
+          <rect x="38" y="36" width="290" height="62" rx="0" fill="url(#bodyG)"/>
+          {/* Front pillar + hood area */}
+          <path d="M328 36 L328 98 L368 98 L375 88 L378 72 L376 56 L368 42 L350 36 Z" fill="url(#hoodG)"/>
+          {/* Hood slope */}
+          <path d="M350 36 L368 42 L380 54 L382 36 Z" fill="#1a5090"/>
+
+          {/* Body top edge highlight */}
+          <rect x="38" y="36" width="312" height="4" rx="0" fill="rgba(255,255,255,0.12)"/>
+
+          {/* === ROOF (flat boxy SUV roof) === */}
+          <rect x="60" y="14" width="255" height="24" rx="3" fill="#16325c"/>
+          <rect x="60" y="14" width="255" height="10" rx="3" fill="url(#roofShine)"/>
+
+          {/* Roof rack */}
+          <rect x="70" y="11" width="235" height="4" rx="2" fill="rgba(200,200,220,0.35)"/>
+          {[90,120,155,190,225,260,285].map(rx => (
+            <rect key={rx} x={rx} y="10" width="3" height="7" rx="1" fill="rgba(180,180,200,0.3)"/>
+          ))}
+
+          {/* A-pillar */}
+          <path d="M60 14 L60 38 L95 38 L115 14 Z" fill="#14305a"/>
+          {/* C-pillar */}
+          <path d="M315 14 L295 38 L315 38 Z" fill="#14305a"/>
+          {/* D-pillar (rear) */}
+          <path d="M315 14 L315 38 L330 38 L330 20 Z" fill="#0f2448"/>
+
+          {/* === WINDOWS === */}
+          {/* Windshield — large, slightly raked */}
+          <path d="M62 37 L98 15 L168 15 L168 38 Z" fill="rgba(120,185,255,0.55)" stroke="rgba(255,255,255,0.2)" strokeWidth="0.8"/>
+          {/* Window 1 (front door) */}
+          <rect x="170" y="15" width="70" height="23" rx="1" fill="rgba(100,165,255,0.45)" stroke="rgba(255,255,255,0.15)" strokeWidth="0.8"/>
+          {/* Window 2 (rear door) */}
+          <rect x="244" y="15" width="68" height="23" rx="1" fill="rgba(85,150,240,0.4)" stroke="rgba(255,255,255,0.12)" strokeWidth="0.8"/>
+          {/* Quarter glass */}
+          <path d="M316 15 L314 38 L328 38 L330 18 Z" fill="rgba(70,130,210,0.35)" stroke="rgba(255,255,255,0.1)" strokeWidth="0.8"/>
+
+          {/* === DOOR LINES === */}
+          <line x1="170" y1="14" x2="167" y2="98" stroke="rgba(0,0,0,0.35)" strokeWidth="2"/>
+          <line x1="244" y1="14" x2="244" y2="98" stroke="rgba(0,0,0,0.35)" strokeWidth="2"/>
+          <line x1="314" y1="14" x2="316" y2="98" stroke="rgba(0,0,0,0.35)" strokeWidth="2"/>
+
+          {/* Door handles */}
+          <rect x="190" y="68" width="28" height="5" rx="2.5" fill="rgba(200,210,230,0.5)"/>
+          <rect x="264" y="68" width="28" height="5" rx="2.5" fill="rgba(200,210,230,0.5)"/>
+
+          {/* === FRONT DETAILS === */}
+          {/* Front bumper */}
+          <path d="M368 98 L380 90 L384 76 L384 100 L368 100 Z" fill="#0a1830"/>
+          <rect x="370" y="94" width="14" height="4" rx="1" fill="#1560a0" opacity="0.7"/>
+
+          {/* Grill */}
+          <rect x="366" y="56" width="16" height="28" rx="2" fill="#040c18"/>
+          <rect x="368" y="48" width="14" height="8" rx="1" fill="#060e1c"/>
+          {[59,64,69,74,79].map((gy,i) => (
+            <line key={i} x1="367" y1={gy} x2="381" y2={gy} stroke="rgba(255,255,255,0.15)" strokeWidth="1"/>
+          ))}
+          {/* Grill badge */}
+          <rect x="371" y="65" width="8" height="8" rx="1" fill="#1971C2" opacity="0.8"/>
+
+          {/* Headlight — sleek angular */}
+          <path d="M362 44 L380 44 L384 52 L384 60 L378 62 L362 58 Z" fill="#060e20"/>
+          <path d="M364 46 L378 46 L382 52 L364 56 Z" fill="rgba(255,230,100,0.85)"/>
+          <path d="M366 48 L376 48 L379 52 L366 54 Z" fill="rgba(255,245,180,0.95)"/>
+          {/* DRL strip */}
+          <rect x="358" y="42" width="24" height="3" rx="1.5" fill="#7ec8e3"/>
+          <rect x="358" y="42" width="24" height="1.5" rx="1" fill="rgba(255,255,255,0.6)"/>
+
+          {/* Headlight beams — inside SVG so they stay with car */}
+          <defs>
+            <linearGradient id="beam1" x1="0" y1="0.5" x2="1" y2="0.5">
+              <stop offset="0%" stopColor="rgba(255,220,80,0.45)"/>
+              <stop offset="100%" stopColor="rgba(255,220,80,0)"/>
+            </linearGradient>
+            <linearGradient id="beam2" x1="0" y1="0.5" x2="1" y2="0.5">
+              <stop offset="0%" stopColor="rgba(255,240,140,0.6)"/>
+              <stop offset="100%" stopColor="rgba(255,240,140,0)"/>
+            </linearGradient>
+          </defs>
+          <polygon points="382,52 820,5 820,100" fill="url(#beam1)"/>
+          <polygon points="382,52 650,20 650,84" fill="url(#beam2)"/>
+
+          {/* === TAIL LIGHTS === */}
+          <rect x="30" y="44" width="9" height="32" rx="2" fill="#8b0000"/>
+          <rect x="31" y="45" width="6" height="28" rx="1" fill="#cc1111"/>
+          <rect x="32" y="46" width="3" height="12" rx="1" fill="rgba(255,80,80,0.9)"/>
+          {/* Tail light strip */}
+          <rect x="38" y="44" width="3" height="32" fill="rgba(180,0,0,0.4)"/>
+
+          {/* Side mirror */}
+          <rect x="356" y="46" width="16" height="11" rx="2" fill="#0e2444"/>
+          <rect x="357" y="47" width="13" height="8" rx="1" fill="#1a3060"/>
+
+          {/* Side skirt */}
+          <rect x="38" y="96" width="330" height="6" rx="2" fill="rgba(0,0,0,0.5)"/>
+          {/* Chrome strip */}
+          <rect x="38" y="93" width="330" height="2" fill="rgba(200,210,230,0.2)"/>
+
+          {/* Under glow */}
+          <ellipse cx="200" cy="110" rx="150" ry="6" fill="rgba(25,113,194,0.18)"/>
+
+          {/* === WHEELS === */}
+          {[95, 305].map(wx => (
+            <g key={wx} transform={`translate(${wx}, 108)`}>
+              {/* Tyre */}
+              <circle r="30" fill="#0c0c0c"/>
+              <circle r="29" fill="none" stroke="#1a1a1a" strokeWidth="2"/>
+              {/* Rim */}
+              <circle r="22" fill="#222"/>
+              {/* 6 spokes */}
+              {[0,60,120,180,240,300].map(deg => (
+                <g key={deg} transform={`rotate(${deg})`}>
+                  <rect x="-2.5" y="-20" width="5" height="15" rx="2" fill="#c0c0c0"/>
+                  <rect x="-1" y="-20" width="2" height="15" rx="1" fill="rgba(255,255,255,0.3)"/>
+                </g>
+              ))}
+              {/* Center */}
+              <circle r="7" fill="#444"/>
+              <circle r="4.5" fill="#1971C2"/>
+              <circle r="2" fill="rgba(255,255,255,0.5)"/>
+              {/* Brake disc */}
+              <circle r="16" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5"/>
+              <circle r="12" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      {/* KAVACH title */}
+      <div className="hero-title" style={{ position:"absolute", top:"10%", left:0, right:0, textAlign:"center", zIndex:10 }}>
+        <div style={{ fontSize:"clamp(52px,8vw,96px)", fontWeight:900, color:"#fff", letterSpacing:"-3px", lineHeight:1 }}>
           KAVACH
         </div>
-        <div style={{ fontSize:"clamp(11px,1.4vw,15px)", color:"rgba(255,255,255,0.65)", letterSpacing:".2em", marginTop:4 }}>
+      </div>
+
+      {/* Subtitle */}
+      <div className="hero-sub" style={{ position:"absolute", top:"calc(10% + clamp(56px,9vw,104px))", left:0, right:0, textAlign:"center", zIndex:10 }}>
+        <div style={{ fontSize:"clamp(10px,1.2vw,14px)", color:"rgba(255,255,255,0.6)", letterSpacing:".22em" }}>
           AI-POWERED SUPPLIER EVALUATION SYSTEM
         </div>
       </div>
 
       {/* Cards */}
-      <div style={{
-        position:"absolute", bottom:"8%", left:0, right:0,
-        display:"flex", gap:20, justifyContent:"center", flexWrap:"wrap", padding:"0 20px", zIndex:10,
-        opacity: phase==="reveal" ? 1 : 0,
-        transform: phase==="reveal" ? "translateY(0)" : "translateY(40px)",
-        transition: "opacity 0.9s ease 0.5s, transform 0.9s ease 0.5s",
-      }}>
+      <div className="hero-cards" style={{ position:"absolute", bottom:"4%", left:0, right:0,
+        display:"flex", gap:20, justifyContent:"center", flexWrap:"wrap", padding:"0 20px", zIndex:10 }}>
         {[
-          { id:"oem", icon:"🏭", title:"Login as OEM", desc:"Design Engineer — Upload RFI, evaluate suppliers, generate reports", btn:"Enter as OEM →", bg:"#1971C2" },
-          { id:"supplier", icon:"🔧", title:"Login as Supplier", desc:"Application Engineer — Upload your product catalogue for evaluation", btn:"Enter as Supplier →", bg:"#2F9E44" }
+          { id:"oem", icon:"🏭", title:"Login as OEM", desc:"Design Engineer — Upload RFI, evaluate supplier variants, generate compliance reports", btn:"Enter as OEM →", bg:"#1971C2" },
+          { id:"supplier", icon:"🔧", title:"Login as Supplier", desc:"Application Engineer — Upload your catalogue to make it available for evaluation", btn:"Enter as Supplier →", bg:"#2F9E44" }
         ].map(card => (
-          <div key={card.id} onClick={() => onSelect(card.id)}
-            style={{ background:"rgba(255,255,255,0.95)", borderRadius:16, padding:"28px 28px", width:260,
-              cursor:"pointer", backdropFilter:"blur(10px)",
-              boxShadow:"0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1)",
-              transition:"transform .2s, box-shadow .2s", textAlign:"center" }}
-            onMouseEnter={e => { e.currentTarget.style.transform="translateY(-6px) scale(1.02)"; e.currentTarget.style.boxShadow="0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.15)"; }}
-            onMouseLeave={e => { e.currentTarget.style.transform="translateY(0) scale(1)"; e.currentTarget.style.boxShadow="0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1)"; }}>
+          <div key={card.id} className="card-hover" onClick={() => onSelect(card.id)}
+            style={{ background:"rgba(255,255,255,0.95)", borderRadius:16, padding:"24px 26px", width:250,
+              boxShadow:"0 20px 60px rgba(0,0,0,0.5)", textAlign:"center" }}>
             <div style={{ fontSize:36, marginBottom:10 }}>{card.icon}</div>
             <div style={{ fontSize:16, fontWeight:700, color:"#1a1a2e", marginBottom:6 }}>{card.title}</div>
             <div style={{ fontSize:11, color:"#555", lineHeight:1.6, marginBottom:16 }}>{card.desc}</div>
-            <div style={{ background:card.bg, color:"#fff", padding:"9px 20px", borderRadius:8, fontSize:12, fontWeight:700, letterSpacing:".03em" }}>{card.btn}</div>
+            <div style={{ background:card.bg, color:"#fff", padding:"9px 20px", borderRadius:8, fontSize:12, fontWeight:700 }}>{card.btn}</div>
           </div>
         ))}
       </div>
     </div>
   );
 }
-
 // ══════════════════════════════════════════════════════════════════
 // SUPPLIER PORTAL
 // ══════════════════════════════════════════════════════════════════
