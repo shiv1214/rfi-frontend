@@ -482,11 +482,17 @@ function SupplierPortal({ onBack }) {
 // SUPPLIER CONVERSATIONS VIEW
 // ══════════════════════════════════════════════════════════════════
 function SupplierConversations({ companyName }) {
-  const [convs, setConvs]     = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [selConv, setSelConv] = useState(null);
+  const [convs, setConvs]       = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [selConv, setSelConv]   = useState(null);
   const [convData, setConvData] = useState(null);
   const [loadingConv, setLoadingConv] = useState(false);
+
+  // Follow-up chat state
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput]       = useState("");
+  const [chatLoading, setChatLoading]   = useState(false);
+  const chatEndRef = useRef(null);
 
   const load = async () => {
     if (!companyName?.trim()) return;
@@ -501,14 +507,59 @@ function SupplierConversations({ companyName }) {
 
   useEffect(() => { if(companyName) load(); }, [companyName]);
 
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior:"smooth" });
+  }, [chatMessages]);
+
   const openConv = async (id) => {
     setSelConv(id); setLoadingConv(true);
+    setChatMessages([]); setChatInput("");
     try {
       const r = await fetch(`${SERVER}/conversation/${id}`);
       const d = await r.json();
       setConvData(d);
     } catch(e) { console.error(e); }
     setLoadingConv(false);
+  };
+
+  const buildSummary = (conv) => {
+    if (!conv) return "";
+    const results = (conv.variantResults||[]).map(v =>
+      `${v.name}: ${v.status==="active"?"PASSED":"ELIMINATED"} (MH ${v.mhPassed}/${v.mhTotal}, GTH ${v.gthMatched||0}/${v.gthTotal})${v.eliminationReason ? ` — Reason: ${v.eliminationReason}` : ""}${v.deviations?.length ? ` — Deviations: ${v.deviations.join(", ")}` : ""}`
+    ).join("\n");
+
+    const allMsgs = [
+      ...(conv.sharedMessages||[]).filter(m=>m.type==="msg").map(m => `${m.role==="tml"?"TML":"Supplier"}: ${m.text}`),
+      ...Object.entries(conv.variantChats||{}).flatMap(([vn, msgs]) =>
+        msgs.filter(m=>m.type==="msg").map(m => `[${vn}] ${m.role==="tml"?"TML":"Supplier"}: ${m.text}`)
+      )
+    ].slice(-30).join("\n");
+
+    return `Evaluation Date: ${new Date(conv.savedAt).toLocaleDateString()}\n\nVariant Results:\n${results}\n\nConversation Highlights:\n${allMsgs}`;
+  };
+
+  const sendChat = async () => {
+    if (!chatInput.trim() || chatLoading) return;
+    const userMsg = chatInput.trim();
+    setChatInput("");
+    setChatMessages(prev => [...prev, { role:"user", text:userMsg }]);
+    setChatLoading(true);
+
+    try {
+      const r = await fetch(`${SERVER}/api/chat`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          userMessage: userMsg,
+          convSummary: buildSummary(convData),
+          history: chatMessages.map(m => ({ role:m.role, content:m.text }))
+        })
+      });
+      const d = await r.json();
+      setChatMessages(prev => [...prev, { role:"assistant", text:d.reply || "Sorry, could not get a response." }]);
+    } catch(e) {
+      setChatMessages(prev => [...prev, { role:"assistant", text:"Error: " + e.message }]);
+    }
+    setChatLoading(false);
   };
 
   if (!companyName?.trim()) return null;
@@ -574,9 +625,9 @@ function SupplierConversations({ companyName }) {
 
             {loadingConv && <div style={{ padding:20, textAlign:"center", color:T.textMuted }}>Loading conversation…</div>}
 
-            {/* Messages — SUPPLIER POV (supplier left, TML right) */}
+            {/* Messages — fixed height scrollable, NOT flex:1 */}
             {!loadingConv && (
-              <div style={{ flex:1, overflowY:"auto", padding:16, display:"flex", flexDirection:"column", gap:8 }}>
+              <div style={{ height:"calc(88vh - 280px)", overflowY:"auto", padding:16, display:"flex", flexDirection:"column", gap:8 }}>
                 {/* Shared messages (Phase 1) */}
                 {(convData.sharedMessages||[]).filter(m=>m.type==="msg"||m.type==="divider").map(msg => {
                   if (msg.type==="divider") return (
@@ -640,6 +691,57 @@ function SupplierConversations({ companyName }) {
                   </div>
                 ))}
               </div>
+            )}
+
+            {/* ── FOLLOW-UP CHAT — sticky at bottom ── */}
+            {!loadingConv && convData && (
+              <>
+                {/* Divider */}
+                <div style={{ padding:"10px 16px", borderTop:`1px solid ${T.border}`, background:T.surface2, display:"flex", alignItems:"center", gap:8 }}>
+                  <div style={{ width:8, height:8, borderRadius:"50%", background:T.success }}/>
+                  <span style={{ fontSize:12, fontWeight:600, color:T.textSub }}>Continue Conversation — Ask anything about this evaluation</span>
+                </div>
+
+                {/* Chat messages */}
+                {chatMessages.length > 0 && (
+                  <div style={{ maxHeight:160, overflowY:"auto", padding:"10px 16px", display:"flex", flexDirection:"column", gap:8, borderTop:`1px solid ${T.border}` }}>
+                    {chatMessages.map((m, i) => (
+                      <div key={i} style={{ display:"flex", flexDirection:m.role==="user"?"row-reverse":"row", gap:8, alignItems:"flex-end" }}>
+                        <div style={{ width:26, height:26, borderRadius:8, background:m.role==="user"?T.primaryBg:T.surface2, border:`1.5px solid ${m.role==="user"?T.primary:T.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:700, color:m.role==="user"?T.primary:T.textSub, flexShrink:0 }}>
+                          {m.role==="user"?"YOU":"AI"}
+                        </div>
+                        <div style={{ maxWidth:"78%", padding:"9px 13px", borderRadius:10, fontSize:13, lineHeight:1.6, background:m.role==="user"?T.primaryBg:T.surface, border:`1px solid ${m.role==="user"?T.primary+"30":T.border}`, color:T.text, borderTopRightRadius:m.role==="user"?2:10, borderTopLeftRadius:m.role==="user"?10:2 }}>
+                          {m.text}
+                        </div>
+                      </div>
+                    ))}
+                    {chatLoading && (
+                      <div style={{ display:"flex", gap:8, alignItems:"flex-end" }}>
+                        <div style={{ width:26, height:26, borderRadius:8, background:T.surface2, border:`1.5px solid ${T.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:700, color:T.textSub }}>AI</div>
+                        <div style={{ padding:"10px 14px", borderRadius:10, background:T.surface, border:`1px solid ${T.border}`, display:"flex", gap:4 }}>
+                          {[0,1,2].map(i => <div key={i} style={{ width:5, height:5, borderRadius:"50%", background:T.textMuted, animation:`td 1.1s ${i*0.18}s infinite` }}/>)}
+                        </div>
+                      </div>
+                    )}
+                    <div ref={chatEndRef}/>
+                  </div>
+                )}
+
+                {/* Input box */}
+                <div style={{ padding:"12px 16px", borderTop:`1px solid ${T.border}`, display:"flex", gap:8, background:T.surface }}>
+                  <input
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => e.key==="Enter" && !e.shiftKey && sendChat()}
+                    placeholder="Ask about this evaluation... e.g. Why was Beta eliminated? What were the GTH deviations?"
+                    style={{ flex:1, padding:"9px 12px", border:`1px solid ${T.border2}`, borderRadius:8, fontSize:13, color:T.text, outline:"none", background:T.surface }}
+                  />
+                  <button onClick={sendChat} disabled={chatLoading || !chatInput.trim()}
+                    style={{ padding:"9px 16px", background:chatInput.trim()&&!chatLoading?T.primary:T.border, color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:chatInput.trim()&&!chatLoading?"pointer":"not-allowed" }}>
+                    Send
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -793,7 +895,6 @@ function OEMPortal({ onBack }) {
     const sharedHist = [];
     const seed = "We have received your RFI submission. Please proceed with your questions about this project.";
     addShared("tml", seed);
-    localSharedRef.current.push({ role:"tml", text:seed, type:"msg", id:Date.now()+Math.random() });
     sharedHist.push({ role:"user", content:seed });
 
     for (let i=0; i<4; i++) {
@@ -803,7 +904,6 @@ function OEMPortal({ onBack }) {
       setTyping(null);
       if (!supQ) continue;
       addShared("supplier", supQ);
-      localSharedRef.current.push({ role:"supplier", text:supQ, type:"msg", id:Date.now()+Math.random() });
       sharedHist.push({ role:"assistant", content:supQ });
       await wait(300);
 
@@ -812,7 +912,6 @@ function OEMPortal({ onBack }) {
       setTyping(null);
       if (!tmlA) continue;
       addShared("tml", tmlA);
-      localSharedRef.current.push({ role:"tml", text:tmlA, type:"msg", id:Date.now()+Math.random() });
       sharedHist.push({ role:"user", content:tmlA });
       await wait(300);
     }
